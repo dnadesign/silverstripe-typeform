@@ -80,6 +80,9 @@ class SyncTypeformSubmissions extends BuildTask {
 	}
 }
 
+/**
+ * @package typeform
+ */
 class SyncTypeformSubmissions_Single {
 	
 	/**

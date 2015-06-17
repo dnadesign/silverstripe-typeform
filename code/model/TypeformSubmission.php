@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * @package typeform
+ */
 class TypeformSubmission extends DataObject {
 	
 	private static $db = array(
@@ -61,6 +64,9 @@ class TypeformSubmission extends DataObject {
 	}
 }
 
+/**
+ * @package typeform
+ */
 class TypeformSubmission_Deleted extends DataObject {
 
 	private static $db = array(
@@ -77,7 +83,9 @@ class TypeformSubmission_Deleted extends DataObject {
 	);
 }
 
-
+/**
+ * @package typeform
+ */
 class TypeformSubmission_Answer extends DataObject {
 
 	private static $db = array(
