@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * @package typeform
+ */
 class TypeformQuestion extends DataObject {
 	
 	private static $db = array(

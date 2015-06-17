@@ -168,7 +168,7 @@ class SyncTypeformSubmissions_Single {
 			$existing->write();
 		}
 	}
-
+	
 	public function populateResponses($responses, $target, &$results) {
 		// assumes comments don't update.
 		foreach($responses as $response) {
