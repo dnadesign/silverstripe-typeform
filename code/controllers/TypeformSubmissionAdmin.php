@@ -3,17 +3,17 @@
 /**
  * @package typeform
  */
-class TypeformSubmissionAdmin extends ModelAdmin {
+class TypeformSubmissionAdmin extends ModelAdmin
+{
 
-	private static $managed_models = array(
-		'TypeformSubmission',
-		'TypeformSubmission_Deleted'
-	);
+    private static $managed_models = array(
+        'TypeformSubmission',
+        'TypeformSubmission_Deleted'
+    );
 
-	private static $menu_title = 'Typeform';
+    private static $menu_title = 'Typeform';
 
-	private static $url_segment = 'typeform';
+    private static $url_segment = 'typeform';
 
-	public $showImportForm = false;
-
+    public $showImportForm = false;
 }

@@ -1,12 +1,13 @@
 <?php
 
-interface ITypeform {
-	
-	function getTypeformUid();
+interface ITypeform
+{
+    
+    public function getTypeformUid();
 
-	function getLastTypeformImportedTimestamp();
+    public function getLastTypeformImportedTimestamp();
 
-	function updateLastTypeformImportedTimestamp();
+    public function updateLastTypeformImportedTimestamp();
 
-	function updateTypeformStats($stats);
+    public function updateTypeformStats($stats);
 }
