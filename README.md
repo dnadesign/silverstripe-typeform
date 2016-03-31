@@ -22,12 +22,12 @@ made through Typeform are brought into SilverStripe to be managed through a
 
 ## Usage
 
-Add the `TypeformPageExtension` extension to your formable page type. For 
+Add the `TypeformExtension` extension to your formable page type. For 
 example, in mysite/_config/extensions.yml
 
 	Page:
 	  extensions:
-	    - TypeformPageExtension
+	    - TypeformExtension
 
 Rebuild the database and complete the new Typeform tab in the CMS.
 
@@ -37,6 +37,12 @@ invoking the `SyncTypeformSubmissions_Single` class
 
 	$sync = new SyncTypeformSubmissions_Single($this->TypeformKey);
 	$results = $sync->syncComments($this);
+
+## Features
+
+	* Imports questions, forms and submissions into SilverStripe Data Models
+	* Attach Typeform pages to any SilverStripe Object
+	* CMS Admin interface for viewing and managing Typeform data
 
 	
 	

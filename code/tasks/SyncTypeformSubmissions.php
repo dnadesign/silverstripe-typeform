@@ -37,18 +37,28 @@ class SyncTypeformSubmissions extends BuildTask
         foreach ($this->config()->typeform_classes as $class) {
             $forms = DataObject::get($class);
 
+            if (Director::is_cli()) {
+                echo "Syncing ". $class ." forms\n";
+            } else {
+                echo "<p>Syncing ". $class . " forms</p>";
+            }
+
             if (!$formId) {
                 if (Director::is_cli()) {
-                    echo "Syncing ". $forms->count() . " forms\n";
+                    echo $forms->count() . " found\n";
                 } else {
-                    echo "<p>Syncing ". $forms->count() . " forms</p>";
+                    echo "<p>". $forms->count() . " found</p>";
                 }
             }
 
             foreach ($forms as $form) {
-                $key = $form->getTypeformUid();
+            	$key = null;
 
-                if ($formId && $form->ID !== $formId) {
+            	if($form->hasMethod('getTypeformUid')) {
+                	$key = $form->getTypeformUid();
+                }
+
+                if ($key && $formId && $form->ID !== $formId) {
                     if (Director::is_cli()) {
                         echo sprintf("* Skipping %s\n", $form->Title);
                     } else {
@@ -122,18 +132,18 @@ class SyncTypeformSubmissions_Single
         $response = $rest->request(
             sprintf("%s?key=%s&completed=true&offset=0&limit=%s%s",
                 $this->formKey,
-                SiteConfig::current_site_config()->TypeformKey,
+                SiteConfig::current_site_config()->TypeformApiKey,
                 $offset,
                 $limit,
                 $since
             )
         );
-
+        
         if ($response && !$response->isError()) {
             $body = json_decode($response->getBody(), true);
 
             if (isset($body['stats'])) {
-                $target->updateTypeformStats($body['stats']);
+                $target->extend('updateTypeformStats', $body['stats']);
             }
 
             if (isset($body['questions'])) {
