@@ -76,9 +76,9 @@ class SyncTypeformSubmissions extends BuildTask
                     $synced = $results['synced'];
 
                     if (Director::is_cli()) {
-                        echo sprintf("* %d/%d submissions for %s\n", $synced, $total, $form->Title);
+                        echo sprintf("* %d new synced submissions out of %d total for %s\n", $synced, $total, $form->Title);
                     } else {
-                        echo sprintf("<li>%s/%s submissions for %s</li>", $synced, $total, $form->Title);
+                        echo sprintf("<li>%d new synced submissions out of %d for %s</li>", $synced, $total, $form->Title);
                     }
                 } else {
                     if (Director::is_cli()) {
@@ -123,9 +123,13 @@ class SyncTypeformSubmissions_Single
         $limit = 500;
 
         $since = $target->getLastTypeformImportedTimestamp();
-        
-        if ($since && !$force) {
-            $since = '&since='. $since;
+
+        if (!$force) {
+            if($since) {
+                $since = '&since='. $since;
+            }
+        } else {
+            $since = '';
         }
 
         $rest = new RestfulService("https://api.typeform.com/v0/form/", 0);
@@ -138,7 +142,7 @@ class SyncTypeformSubmissions_Single
                 $since
             )
         );
-        
+
         if ($response && !$response->isError()) {
             $body = json_decode($response->getBody(), true);
 
@@ -151,7 +155,7 @@ class SyncTypeformSubmissions_Single
             }
 
             if (isset($body['responses'])) {
-                $this->populateResponses($body['responses'], $target, $results);
+                $this->populateResponses($body['responses'], $target, $results, $force);
             }
 
             // if the number of responses are 500, then we assume we need to 
@@ -180,12 +184,22 @@ class SyncTypeformSubmissions_Single
                 $existing->Reference = $question['id'];
             }
 
+            $existing->FieldID = $question['field_id'];
+
+            if(isset($question['group']) && $question['group']) {
+                $group = TypeformQuestion::get()->filter('Reference', $question['group'])->first();
+                
+                if($group) {
+                    $existing->GroupFieldID = $group->ID;
+                }
+            }
+
             $existing->Title = $question['question'];
             $existing->write();
         }
     }
     
-    public function populateResponses($responses, $target, &$results)
+    public function populateResponses($responses, $target, &$results, $force)
     {
         // assumes comments don't update.
         foreach ($responses as $response) {
@@ -196,7 +210,7 @@ class SyncTypeformSubmissions_Single
                 'ParentID' => $target->ID
             ));
 
-            if ($deleted->count() > 0) {
+            if ($deleted->count() > 0 && !$force) {
                 continue;
             }
 

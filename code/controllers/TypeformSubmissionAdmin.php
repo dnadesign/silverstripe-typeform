@@ -8,6 +8,7 @@ class TypeformSubmissionAdmin extends ModelAdmin
 
     private static $managed_models = array(
         'TypeformSubmission',
+        'TypeformQuestion',
         'TypeformSubmission_Deleted'
     );
 
