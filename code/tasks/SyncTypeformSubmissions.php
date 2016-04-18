@@ -1,263 +1,262 @@
 <?php
 
 /**
- * Connects with the provided Typeform API key and fetches the responses to 
+ * Connects with the provided Typeform API key and fetches the responses to
  * cache locally within SilverStripe.
  *
- * Operation is via a cron job on the server which is scheduled to run once an 
- * hour. Comments for a single form are synced through the 
- * {@link SyncTypeformSubmissions_Single} class. 
+ * Operation is via a cron job on the server which is scheduled to run once an
+ * hour. Comments for a single form are synced through the
+ * {@link SyncTypeformSubmissions_Single} class.
  *
  * @package typeform
  */
-class SyncTypeformSubmissions extends BuildTask
-{
-    
-    private static $typeform_classes = array(
-        'Page'
-    );
+class SyncTypeformSubmissions extends BuildTask {
 
-    public function run($request)
-    {
-        $formId = $request->getVar('form');
-        $force = $request->getVar('force') || false;
-        
-        if ($request->getVar('delete') && Director::isDev()) {
-            $submissions = TypeformSubmission::get();
+	private static $typeform_classes = array(
+		'Page',
+	);
 
-            if ($formId) {
-                $submissions = $submissions->filter('ParentID', $formId);
-            }
+	public function run($request) {
+		increase_time_limit_to();
+		increase_memory_limit_to();
 
-            foreach ($submissions as $submission) {
-                $submission->delete();
-            }
-        }
-        
-        foreach ($this->config()->typeform_classes as $class) {
-            $forms = DataObject::get($class);
+		$formId = $request->getVar('form');
+		$force = $request->getVar('force') || false;
 
-            if (Director::is_cli()) {
-                echo "Syncing ". $class ." forms\n";
-            } else {
-                echo "<p>Syncing ". $class . " forms</p>";
-            }
+		if ($request->getVar('delete') && Director::isDev()) {
+			$submissions = TypeformSubmission::get();
 
-            if (!$formId) {
-                if (Director::is_cli()) {
-                    echo $forms->count() . " found\n";
-                } else {
-                    echo "<p>". $forms->count() . " found</p>";
-                }
-            }
+			if ($formId) {
+				$submissions = $submissions->filter('ParentID', $formId);
+			}
 
-            foreach ($forms as $form) {
-            	$key = null;
+			foreach ($submissions as $submission) {
+				$submission->delete();
+			}
+		}
 
-            	if($form->hasMethod('getTypeformUid')) {
-                	$key = $form->getTypeformUid();
-                }
+		foreach ($this->config()->typeform_classes as $class) {
+			$forms = DataObject::get($class);
 
-                if ($key && $formId && $form->ID !== $formId) {
-                    if (Director::is_cli()) {
-                        echo sprintf("* Skipping %s\n", $form->Title);
-                    } else {
-                        echo sprintf("<li>Skipping %s</li>", $form->Title);
-                    }
+			if (Director::is_cli()) {
+				echo "Syncing " . $class . " forms\n";
+			} else {
+				echo "<p>Syncing " . $class . " forms</p>";
+			}
 
-                    continue;
-                }
+			if (!$formId) {
+				if (Director::is_cli()) {
+					echo $forms->count() . " found\n";
+				} else {
+					echo "<p>" . $forms->count() . " found</p>";
+				}
+			}
 
-                if ($key) {
-                    $fetch = new SyncTypeformSubmissions_Single($key);
-                    $results = $fetch->syncComments($form, $force);
+			foreach ($forms as $form) {
+				$key = null;
 
-                    $total = $results['total'];
-                    $synced = $results['synced'];
+				if ($form->hasMethod('getTypeformUid')) {
+					$key = $form->getTypeformUid();
+				}
 
-                    if (Director::is_cli()) {
-                        echo sprintf("* %d new synced submissions out of %d total for %s\n", $synced, $total, $form->Title);
-                    } else {
-                        echo sprintf("<li>%d new synced submissions out of %d for %s</li>", $synced, $total, $form->Title);
-                    }
-                } else {
-                    if (Director::is_cli()) {
-                        echo sprintf("* No valid key for %s\n", $form->Title);
-                    } else {
-                        echo sprintf("<li>No valid key for %s</li>", $form->Title);
-                    }
-                }
-            }
-        }
-    }
+				if ($key && $formId && $form->ID !== $formId) {
+					if (Director::is_cli()) {
+						echo sprintf("* Skipping %s\n", $form->Title);
+					} else {
+						echo sprintf("<li>Skipping %s</li>", $form->Title);
+					}
+
+					continue;
+				}
+
+				if ($key) {
+					$fetch = new SyncTypeformSubmissions_Single($key);
+					$results = $fetch->syncComments($form, $force);
+
+					$total = $results['total'];
+					$synced = $results['synced'];
+
+					if (Director::is_cli()) {
+						echo sprintf("* %d new synced submissions out of %d total for %s\n", $synced, $total, $form->Title);
+					} else {
+						echo sprintf("<li>%d new synced submissions out of %d for %s</li>", $synced, $total, $form->Title);
+					}
+				} else {
+					if (Director::is_cli()) {
+						echo sprintf("* No valid key for %s\n", $form->Title);
+					} else {
+						echo sprintf("<li>No valid key for %s</li>", $form->Title);
+					}
+				}
+			}
+		}
+	}
 }
 
 /**
  * @package typeform
  */
-class SyncTypeformSubmissions_Single
-{
-    
-    /**
-     * @param string $formKey
-     */
-    public function __construct($formKey)
-    {
-        $this->formKey = $formKey;
-    }
+class SyncTypeformSubmissions_Single {
 
-    /**
-     * @param ITypeform $target
-     * @param boolean $force
-     *
-     * @return array
-     */
-    public function syncComments(ITypeform $target, $force = false, $offset = 0)
-    {
-        // either now or 10 minutes.
-        $results = array(
-            'total' => 0,
-            'synced' => 0
-        );
-        
-        $limit = 500;
+	/**
+	 * @param string $formKey
+	 */
+	public function __construct($formKey) {
+		$this->formKey = $formKey;
+	}
 
-        $since = $target->getLastTypeformImportedTimestamp();
+	/**
+	 * @param ITypeform $target
+	 * @param boolean $force
+	 *
+	 * @return array
+	 */
+	public function syncComments(ITypeform $target, $force = false, $offset = 0) {
+		// either now or 10 minutes.
+		$results = array(
+			'total' => 0,
+			'synced' => 0,
+		);
 
-        if (!$force) {
-            if($since) {
-                $since = '&since='. $since;
-            }
-        } else {
-            $since = '';
-        }
+		$limit = 500;
 
-        $rest = new RestfulService("https://api.typeform.com/v0/form/", 0);
-        $response = $rest->request(
-            sprintf("%s?key=%s&completed=true&offset=0&limit=%s%s",
-                $this->formKey,
-                SiteConfig::current_site_config()->TypeformApiKey,
-                $offset,
-                $limit,
-                $since
-            )
-        );
+		$since = $target->getLastTypeformImportedTimestamp();
 
-        if ($response && !$response->isError()) {
-            $body = json_decode($response->getBody(), true);
+		if (!$force) {
+			if ($since) {
+				$since = '&since=' . $since;
+			}
+		} else {
+			$since = '';
+		}
 
-            if (isset($body['stats'])) {
-                $target->extend('updateTypeformStats', $body['stats']);
-            }
+		$rest = new RestfulService("https://api.typeform.com/v0/form/", 0);
+		$url =
+			sprintf("%s?key=%s&completed=true&offset=0&limit=%s%s",
+			$this->formKey,
+			SiteConfig::current_site_config()->TypeformApiKey,
+			$offset,
+			$limit,
+			$since
+		);
 
-            if (isset($body['questions'])) {
-                $this->populateQuestions($body['questions'], $target, $results);
-            }
+		$response = $rest->request($url);
 
-            if (isset($body['responses'])) {
-                $this->populateResponses($body['responses'], $target, $results, $force);
-            }
+		if ($response && !$response->isError()) {
+			$body = json_decode($response->getBody(), true);
 
-            // if the number of responses are 500, then we assume we need to 
-            // sync another page.
-            if ($results['total'] >= $limit) {
-                $this->syncComments($target, $force, $offset + $limit);
-            }
-        } else {
-            SS_Log::log($response->getBody(), SS_Log::WARN);
-        }
+			if (isset($body['stats'])) {
+				$target->extend('updateTypeformStats', $body['stats']);
+			}
 
-        return $results;
-    }
+			if (isset($body['questions'])) {
+				$this->populateQuestions($body['questions'], $target, $results);
+			}
 
-    public function populateQuestions($questions, $target, $results)
-    {
-        foreach ($questions as $question) {
-            $existing = TypeformQuestion::get()->filter(array(
-                'ParentID' => $target->ID,
-                'Reference' => $question['id']
-            ))->first();
+			if (isset($body['responses'])) {
+				$this->populateResponses($body['responses'], $target, $results, $force);
+			}
 
-            if (!$existing) {
-                $existing = TypeformQuestion::create();
-                $existing->ParentID = $target->ID;
-                $existing->Reference = $question['id'];
-            }
+			// if the number of responses are 500, then we assume we need to
+			// sync another page.
+			$body = json_decode($response->getBody());
 
-            $existing->FieldID = $question['field_id'];
+			if ($body->stats->responses->total >= ($offset + $limit)) {
+				$this->syncComments($target, $force, $offset + $limit);
+			}
+		} else {
+			SS_Log::log($response->getBody(), SS_Log::WARN);
+		}
 
-            if(isset($question['group']) && $question['group']) {
-                $group = TypeformQuestion::get()->filter('Reference', $question['group'])->first();
-                
-                if($group) {
-                    $existing->GroupFieldID = $group->ID;
-                }
-            }
+		return $results;
+	}
 
-            $existing->Title = $question['question'];
-            $existing->write();
-        }
-    }
-    
-    public function populateResponses($responses, $target, &$results, $force)
-    {
-        // assumes comments don't update.
-        foreach ($responses as $response) {
-            $results['total']++;
+	public function populateQuestions($questions, $target, $results) {
+		foreach ($questions as $question) {
+			$existing = TypeformQuestion::get()->filter(array(
+				'ParentID' => $target->ID,
+				'Reference' => $question['id'],
+			))->first();
 
-            $deleted = TypeformSubmission_Deleted::get()->filter(array(
-                'TypeformID' => $response['id'],
-                'ParentID' => $target->ID
-            ));
+			if (!$existing) {
+				$existing = TypeformQuestion::create();
+				$existing->ParentID = $target->ID;
+				$existing->Reference = $question['id'];
+			}
 
-            if ($deleted->count() > 0 && !$force) {
-                continue;
-            }
+			$existing->FieldID = $question['field_id'];
 
-            $existing = TypeformSubmission::get()->filter(array(
-                'TypeformID' => $response['id'],
-                'ParentID' => $target->ID
-            ));
+			if (isset($question['group']) && $question['group']) {
+				$group = TypeformQuestion::get()->filter('Reference', $question['group'])->first();
 
-            if ($existing->count() > 0) {
-                continue;
-            } else {
-                $results['synced']++;
-                    
-                // check to make sure it hasn't been deleted
-                $submission = TypeformSubmission::create();
-                
-                $submission->TypeformID = $response['id'];
-                $submission->DateStarted = date("Y-m-d H:i:s", strtotime($response['metadata']['date_land']. ' UTC'));
-                $submission->DateSubmitted =  date("Y-m-d H:i:s", strtotime($response['metadata']['date_submit']. ' UTC'));
+				if ($group) {
+					$existing->GroupFieldID = $group->ID;
+				}
+			}
 
-                $submission->ParentID = $target->ID;
-                $submission->write();
+			$existing->Title = $question['question'];
+			$existing->write();
+		}
+	}
 
-                if (isset($response['answers'])) {
-                    foreach ($response['answers'] as $field => $value) {
-                        $question = TypeformQuestion::get()->filter(array(
-                            'Reference' => $field
-                        ))->first();
+	public function populateResponses($responses, $target, &$results, $force) {
+		// assumes comments don't update.
+		foreach ($responses as $response) {
+			$results['total']++;
 
-                        if (!$question) {
-                            $question = TypeformQuestion::create();
-                            $question->ParentID = $target->ID;
-                            $question->Reference = $reference;
-                            $question->write();
-                        }
+			$deleted = TypeformSubmission_Deleted::get()->filter(array(
+				'TypeformID' => $response['id'],
+				'ParentID' => $target->ID,
+			));
 
-                        $answer = TypeformSubmission_Answer::create();
-                        $answer->Label = $question->Title;
-                        $answer->QuestionID = $question->ID;
-                        $answer->SubmissionID = $submission->ID;
-                        $answer->Value = $value;
-                        $answer->write();
-                    }
-                }
+			if ($deleted->count() > 0 && !$force) {
+				continue;
+			}
 
-                $submission->extend('onAfterAnswersSynced');
-            }
-        }
-    }
+			$existing = TypeformSubmission::get()->filter(array(
+				'TypeformID' => $response['id'],
+				'ParentID' => $target->ID,
+			));
+
+			if ($existing->count() > 0) {
+				continue;
+			} else {
+				$results['synced']++;
+
+				// check to make sure it hasn't been deleted
+				$submission = TypeformSubmission::create();
+
+				$submission->TypeformID = $response['id'];
+				$submission->DateStarted = date("Y-m-d H:i:s", strtotime($response['metadata']['date_land'] . ' UTC'));
+				$submission->DateSubmitted = date("Y-m-d H:i:s", strtotime($response['metadata']['date_submit'] . ' UTC'));
+
+				$submission->ParentID = $target->ID;
+				$submission->write();
+
+				if (isset($response['answers'])) {
+					foreach ($response['answers'] as $field => $value) {
+						$question = TypeformQuestion::get()->filter(array(
+							'Reference' => $field,
+						))->first();
+
+						if (!$question) {
+							$question = TypeformQuestion::create();
+							$question->ParentID = $target->ID;
+							$question->Reference = $reference;
+							$question->write();
+						}
+
+						$answer = TypeformSubmission_Answer::create();
+						$answer->Label = $question->Title;
+						$answer->QuestionID = $question->ID;
+						$answer->SubmissionID = $submission->ID;
+						$answer->Value = $value;
+						$answer->write();
+					}
+				}
+
+				$submission->extend('onAfterAnswersSynced');
+			}
+		}
+	}
 }
